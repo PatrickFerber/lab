@@ -131,7 +131,7 @@ class Report(object):
     """
     Base class for all reports.
     """
-    def __init__(self, attributes=None, format='html', filter=None, **kwargs):
+    def __init__(self, attributes=None, format='html', filter=None, prop_filter=None, **kwargs):
         """
         Inherit from this or a child class to implement a custom report.
 
@@ -228,6 +228,7 @@ class Report(object):
         self.output_format = format
         self.toc = True
         self.run_filter = tools.RunFilter(filter, **kwargs)
+        self.prop_filter = prop_filter
 
     def __call__(self, eval_dir, outfile):
         """Make the report.
@@ -253,6 +254,8 @@ class Report(object):
         # Map from attribute to type.
         self._all_attributes = {}
         self._load_data()
+        if self.prop_filter is not None:
+            self.props = self.prop_filter(self.props)
         self._apply_filter()
         self._scan_data()
 
