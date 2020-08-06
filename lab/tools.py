@@ -233,7 +233,17 @@ class Properties(dict):
         """Write the properties to disk."""
         assert self.filename
         makedirs(os.path.dirname(self.filename))
-        write_file(self.filename, str(self))
+        no_entries = len(self)
+        with open(self.filename, 'w') as f:
+            f.write("{\n")
+            for no, (k, v) in enumerate(self.items()):
+                f.write('"%s": %s%s\n' % (
+                    k,
+                    json.dumps(v, separators=(',', ': '), sort_keys=True),
+                    "" if no == no_entries - 1 else ","))
+            f.write("}\n")
+
+        #write_file(self.filename, str(self))
 
 
 class RunFilter(object):
