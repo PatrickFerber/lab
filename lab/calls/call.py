@@ -18,6 +18,7 @@
 import errno
 import logging
 import os
+import random
 import resource
 import select
 import subprocess
@@ -93,15 +94,9 @@ class Call(object):
                 set_limit(resource.RLIMIT_AS, memory_limit * 1024 * 1024)
             set_limit(resource.RLIMIT_CORE, 0)
 
-        try:
-            self.process = subprocess.Popen(
-                args, preexec_fn=prepare_call, **kwargs)
-        except OSError as err:
-            if err.errno == errno.ENOENT:
-                sys.exit('Error: Call {name} failed. "{path}" not found'.format(
-                    path=args[0], **locals()))
-            else:
-                raise
+        self.args = args
+        self.preexef_fn = prepare_call
+        self.kwargs = kwargs
 
     def _redirect_streams(self):
         """
@@ -187,19 +182,38 @@ class Call(object):
                             self.name, bytes_written / 1024, outfile.name,
                             soft_limit / 1024))
 
-    def wait(self):
-        wall_clock_start_time = time.time()
-        self._redirect_streams()
-        retcode = self.process.wait()
-        for stream, (soft_limit, _) in self.redirected_streams_and_limits.values():
-            # Write output to disk before the next Call starts.
-            stream.flush()
-            os.fsync(stream.fileno())
+    def launch(self):
+        try:
+            self.process = subprocess.Popen(
+                self.args, preexec_fn=self.preexef_fn, **self.kwargs)
+        except OSError as err:
+            if err.errno == errno.ENOENT:
+                sys.exit('Error: Call {name} failed. "{path}" not found'.format(
+                    path=args[0], **locals()))
+            else:
+                raise
 
+    def wait(self):
+        for i in range(5):
+            self.launch()
+            wall_clock_start_time = time.time()
+            self._redirect_streams()
+            retcode = self.process.wait()
+            for stream, (soft_limit, _) in self.redirected_streams_and_limits.values():
+                # Write output to disk before the next Call starts.
+                stream.flush()
+                os.fsync(stream.fileno())
+
+            wall_clock_time = time.time() - wall_clock_start_time
+            # Successfully finished or failed slowly (unlike the strange EOF error)
+            if retcode == 0 or wall_clock_time > 2:
+                break
+            else:
+                time.sleep(random.random() + 0.5)
         # Close files that were opened in the constructor.
         for file in self.opened_files:
             file.close()
-        wall_clock_time = time.time() - wall_clock_start_time
+
         logging.info('{} wall-clock time: {:.2f}s'.format(self.name, wall_clock_time))
         if (self.wall_clock_time_limit is not None and
                 wall_clock_time > self.wall_clock_time_limit):
