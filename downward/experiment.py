@@ -131,7 +131,8 @@ class FastDownwardExperiment(Experiment):
     PLANNER_PARSER = os.path.join(
         DOWNWARD_SCRIPTS_DIR, 'planner-parser.py')
 
-    def __init__(self, path=None, environment=None, revision_cache=None):
+    def __init__(self, path=None, environment=None, revision_cache=None,
+                 compress_logs=True):
         """
         See :class:`lab.experiment.Experiment` for an explanation of
         the *path* and *environment* parameters.
@@ -158,7 +159,8 @@ class FastDownwardExperiment(Experiment):
         >>> exp.add_parser(exp.PLANNER_PARSER)
 
         """
-        Experiment.__init__(self, path=path, environment=environment)
+        Experiment.__init__(self, path=path, environment=environment,
+                            compress_logs=compress_logs)
 
         self.revision_cache = revision_cache or os.path.join(
             get_default_data_dir(), 'revision-cache')

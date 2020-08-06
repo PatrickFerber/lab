@@ -4,6 +4,7 @@
 import logging
 import os
 import platform
+import subprocess
 
 from lab.calls.call import Call
 from lab import tools
@@ -25,3 +26,4 @@ for f in [run_log, run_err]:
     f.close()
     if os.path.getsize(f.name) == 0:
         os.remove(f.name)
+    %(compress)s

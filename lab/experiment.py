@@ -21,6 +21,7 @@ from collections import OrderedDict
 from glob import glob
 import logging
 import os
+import string
 import subprocess
 import sys
 
@@ -47,6 +48,10 @@ steps_group.add_argument(
 STATIC_EXPERIMENT_PROPERTIES_FILENAME = 'static-experiment-properties'
 STATIC_RUN_PROPERTIES_FILENAME = 'static-properties'
 
+
+class SafeDict(dict):
+    def __missing__(self, key):
+        return '{' + key + '}'
 
 def get_default_data_dir():
     """E.g. "ham/spam/eggs.py" => "ham/spam/data/"."""
@@ -347,7 +352,7 @@ class Experiment(_Buildable):
 
     """
 
-    def __init__(self, path=None, environment=None):
+    def __init__(self, path=None, environment=None, compress_logs=True):
         """
         The experiment will be built at *path*. It defaults to
         ``<scriptdir>/data/<scriptname>/``. E.g., for the script
@@ -373,6 +378,7 @@ class Experiment(_Buildable):
             logging.critical('Path contains commas or colons: %s' % self.path)
         self.environment = environment or environments.LocalEnvironment()
         self.environment.exp = self
+        self.compress_logs = compress_logs
 
         self.steps = []
         self.runs = []
@@ -731,10 +737,12 @@ class Run(_Buildable):
             # Support running globally installed binaries.
             def format_arg(arg):
                 if isinstance(arg, basestring):
-                    try:
-                        return repr(arg.format(**env_vars))
-                    except KeyError as err:
-                        logging.critical('Resource {} is undefined.'.format(err))
+                    return repr(string.Formatter().vformat(
+                        arg, (), SafeDict(env_vars)))
+                    #try:
+                    #    return repr(arg.format(**env_vars))
+                    #except KeyError as err:
+                    #    logging.critical('Resource {} is undefined.'.format(err))
                 else:
                     return repr(str(arg))
 
@@ -756,7 +764,10 @@ class Run(_Buildable):
         calls_text = '\n'.join(
             make_call(name, cmd, kwargs)
             for name, (cmd, kwargs) in self.commands.items())
-        run_script = tools.fill_template('run.py', calls=calls_text)
+        compress_text = ("" if not self.experiment.compress_logs else
+                         "else:\n        subprocess.call(['tar', '-czf', f.name + '.tar.xz', f.name, '--remove-files'])")
+        run_script = tools.fill_template('run.py', calls=calls_text,
+                                         compress=compress_text)
 
         self.add_new_file('', 'run', run_script, permissions=0o755)
 
